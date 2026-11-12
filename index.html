@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#211711">
+  <meta name="description" content="Barberlink: encuentra barberías y agenda tu próxima cita.">
+  <title>Barberlink — Agenda de citas</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <a class="brand" href="#" id="home-link" aria-label="Inicio">
+        <span class="brand-mark">B</span><span id="brand-name">BARBERLINK</span>
+      </a>
+      <div class="topbar-actions">
+        <button class="help-guide-button" id="open-navigation-guide" type="button" aria-label="Cómo moverte por la web" aria-haspopup="dialog" aria-controls="navigation-guide-dialog">?</button>
+        <div class="topbar-menu">
+          <button class="menu-toggle" id="menu-toggle" type="button" aria-label="Abrir menú" aria-expanded="false" aria-controls="topbar-menu">
+            <span></span><span></span><span></span>
+          </button>
+          <nav class="topbar-menu-panel hidden" id="topbar-menu" aria-label="Navegación">
+            <button class="menu-item" id="directory-entry" type="button">Todas las barberías</button>
+            <button class="menu-item hidden" id="booking-entry" type="button">Ir a pedir cita</button>
+            <button class="menu-item hidden" id="personal-appointment-entry" type="button">Ver mi cita</button>
+            <button class="menu-item" id="admin-entry" type="button">Panel del barbero</button>
+            <button class="menu-item" id="platform-admin-entry" type="button">Administrar barberías</button>
+            <button class="menu-item menu-item-logout hidden" id="logout-button" type="button">Cerrar sesión</button>
+          </nav>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section id="directory-view" class="view hidden">
+        <div class="hero">
+          <div class="eyebrow"><span class="status-dot"></span> BARBERÍAS CERCA DE TI</div>
+          <h1>Encuentra tu<br><span class="accent">próximo corte.</span></h1>
+          <p>Elige una barbería para ver sus horarios y solicitar tu cita.</p>
+        </div>
+        <div id="barber-directory" class="barber-directory" aria-live="polite">
+          <div class="loading-state">Cargando barberías…</div>
+        </div>
+        <p id="directory-error" class="error-message hidden"></p>
+        <button class="quiet-button full-button guide-entry-button" type="button" data-open-navigation-guide>Información de barberos</button>
+        <footer class="page-footer"><span>Hecho para que disfrutes el momento.</span><a class="terms-link" href="./terminos-y-condiciones-barberlink.pdf" target="_blank" rel="noopener noreferrer">Términos y condiciones</a><span>Hecho por Jose Manuel Morales Estrada</span><span>© <span class="current-year"></span></span></footer>
+      </section>
+
+      <section id="booking-view" class="view">
+        <div class="hero">
+          <div class="eyebrow"><span class="status-dot"></span> AGENDA EN LÍNEA</div>
+          <h1>Tu próximo<br><span class="accent">buen corte.</span></h1>
+          <p>Elige el día y la hora. Te confirmamos tu cita lo antes posible.</p>
+        </div>
+        <section id="barber-public-profile" class="booking-card public-profile hidden" aria-live="polite"></section>
+        <div id="closed-message" class="notice hidden">
+          <strong>Agenda cerrada por ahora</strong>
+          <span id="closed-description">En este momento no estamos recibiendo citas. Intenta más tarde.</span>
+        </div>
+        <section class="booking-card" id="booking-card">
+          <div class="section-heading">
+            <div><span class="step-label">RESERVA EN DOS PASOS</span><h2 id="booking-title">Encuentra tu espacio</h2></div>
+          </div>
+          <div class="booking-step-status" aria-live="polite">
+            <span id="booking-step-indicator">Paso 1 de 2</span>
+            <span id="booking-step-description">Servicios y tus datos</span>
+          </div>
+          <form id="booking-form" novalidate>
+            <section id="booking-step-details" class="booking-step">
+              <label class="field-label" for="booking-staff">Elige tu barbero</label>
+              <select id="booking-staff" required></select>
+              <div class="booking-services-field">
+                <span class="field-label">Servicios que quieres solicitar</span>
+                <p id="booking-services-help" class="form-note">Cargando servicios…</p>
+                <div id="booking-services" class="booking-service-options"></div>
+                <p id="booking-service-total" class="booking-service-total hidden" aria-live="polite"></p>
+              </div>
+              <label class="field-label" for="customer-name">Nombre</label>
+              <input id="customer-name" name="name" type="text" maxlength="80" autocomplete="name" placeholder="¿Cómo te llamas?" required>
+              <label class="field-label" for="customer-phone">Teléfono</label>
+              <input id="customer-phone" name="phone" type="tel" maxlength="20" autocomplete="tel" placeholder="Tu número de celular" required>
+              <label class="field-label" for="customer-email">Correo electrónico</label>
+              <input id="customer-email" name="email" type="email" maxlength="254" autocomplete="email" placeholder="tucorreo@ejemplo.com" required>
+              <label class="field-label" for="payment-method">Método de pago</label>
+              <select id="payment-method" name="payment" required>
+                <option value="cash">Efectivo</option>
+                <option value="transfer">Transferencia</option>
+              </select>
+              <div id="transfer-timing-wrap" class="hidden">
+                <label class="field-label" for="transfer-timing">¿Vas a transferir ahora?</label>
+                <select id="transfer-timing" name="transfer-timing">
+                  <option value="">Selecciona una opción</option>
+                  <option value="now">Sí, transferiré ahora</option>
+                  <option value="later">No, transferiré después</option>
+                </select>
+                <p class="form-note">Al elegir transferencia debes enviar el comprobante desde tu enlace personal. El barbero podrá revisarlo antes de aceptar la cita. Si eliges transferir ahora, también le enviaremos un aviso.</p>
+              </div>
+              <div id="booking-transfer-summary" class="booking-service-total hidden" aria-live="polite"></div>
+              <button class="primary-button full-button" id="booking-next-step" type="button" disabled>Elegir fecha y hora <span>→</span></button>
+            </section>
+            <section id="booking-step-schedule" class="booking-step hidden">
+              <span class="timezone-label booking-timezone-label">Hora Colombia</span>
+              <div class="booking-week-heading">
+                <div><span class="step-label">ELIGE TU DÍA</span><strong id="booking-week-label"></strong></div>
+                <div class="booking-week-controls">
+                  <button id="booking-prev-week" class="icon-button" type="button" aria-label="Semana actual">←</button>
+                  <button id="booking-next-week" class="icon-button" type="button" aria-label="Semana siguiente" disabled>→</button>
+                </div>
+              </div>
+              <div id="booking-week-days" class="booking-week-days" role="group" aria-label="Días disponibles para reservar"></div>
+              <input id="appointment-date" type="hidden">
+              <p id="booking-week-note" class="form-note">Puedes reservar para esta semana. La próxima semana se habilita el domingo.</p>
+              <div class="field-row">
+                <span class="field-label">Horas disponibles</span>
+                <span id="slot-help" class="small-muted">Elige una fecha para ver los horarios</span>
+              </div>
+              <div id="slots" class="slots" aria-live="polite"></div>
+              <div id="selected-slot-summary" class="selected-slot hidden">
+                <span>Tu horario</span><strong id="selected-slot-label"></strong>
+              </div>
+              <div class="booking-notifications">
+                <span class="field-label">Confirmaciones y avisos</span>
+                <label class="notification-consent" for="notification-consent">
+                  <input id="notification-consent" name="notifications" type="checkbox" checked>
+                  <span>Quiero recibir avisos de retraso de esta cita por correo y notificación en este dispositivo.</span>
+                </label>
+                <label class="notification-consent notification-sound-setting" for="notification-sound-enabled">
+                  <input id="notification-sound-enabled" type="checkbox">
+                  <span>Reproducir el sonido personalizado al recibir una notificación push mientras Barberlink esté abierta.</span>
+                </label>
+                <label class="notification-consent" for="reminder-email-consent">
+                  <input id="reminder-email-consent" name="reminder-email-consent" type="checkbox">
+                  <span>Quiero recibir recordatorios por correo 24 horas y 2 horas antes de la cita.</span>
+                </label>
+                <p id="notification-sound-status" class="form-note" role="status">Activa esta opción desde una página segura (HTTPS o localhost). El sonido no funciona si la aplicación está cerrada o suspendida.</p>
+              </div>
+              <div class="booking-step-actions">
+                <button class="quiet-button" id="booking-prev-step" type="button">← Volver a mis datos</button>
+                <button class="primary-button" type="submit" id="submit-booking">Solicitar cita <span>→</span></button>
+              </div>
+              <p class="form-note">Al solicitar, el espacio queda reservado mientras el barbero responde. No necesitas crear una cuenta.</p>
+            </section>
+          </form>
+        </section>
+        <div id="appointment-result" class="booking-card hidden" aria-live="polite"></div>
+        <p id="public-error" class="error-message hidden"></p>
+        <button class="quiet-button full-button guide-entry-button" type="button" data-open-navigation-guide>Información de barberos</button>
+        <footer class="page-footer"><span>Hecho para que disfrutes el momento.</span><a class="terms-link" href="./terminos-y-condiciones-barberlink.pdf" target="_blank" rel="noopener noreferrer">Términos y condiciones</a><span>Hecho por Jose Manuel Morales Estrada</span><span>© <span id="year"></span></span></footer>
+      </section>
+
+      <section id="appointment-view" class="view hidden">
+        <div class="hero compact-hero">
+          <div class="eyebrow"><span class="status-dot"></span> TU CITA</div>
+          <h1>Tu espacio,<br><span class="accent">a tu ritmo.</span></h1>
+          <p>Consulta aquí el estado de tu solicitud.</p>
+        </div>
+        <div id="appointment-details" class="booking-card" aria-live="polite">
+          <div class="loading-state">Cargando tu cita…</div>
+        </div>
+        <p id="appointment-error" class="error-message hidden"></p>
+        <footer class="page-footer page-credit-footer"><span>Hecho por Jose Manuel Morales Estrada</span><span>© <span class="current-year"></span></span></footer>
+      </section>
+
+      <section id="admin-view" class="view hidden">
+        <div id="login-panel" class="booking-card admin-login">
+          <div class="eyebrow"><span class="status-dot"></span> ACCESO PRIVADO</div>
+          <h2>Panel del barbero</h2>
+          <p class="muted">Ingresa con el correo y la contraseña de tu cuenta.</p>
+          <form id="login-form">
+            <label class="field-label" for="login-email">Correo</label>
+            <input id="login-email" type="email" autocomplete="username" required>
+            <div class="password-label-row">
+              <label class="field-label" for="login-password">Contraseña</label>
+              <button class="inline-reset-button" id="forgot-password" type="button">Restablecer contraseña</button>
+            </div>
+            <input id="login-password" type="password" autocomplete="current-password" required>
+            <button class="primary-button full-button" type="submit">Ingresar <span>→</span></button>
+          </form>
+          <p id="login-error" class="error-message hidden"></p>
+        </div>
+        <div id="password-reset-panel" class="booking-card admin-login hidden">
+          <div class="eyebrow"><span class="status-dot"></span> RECUPERACIÓN DE ACCESO</div>
+          <h2 id="password-reset-title">Restablecer contraseña</h2>
+          <p id="password-reset-description" class="muted">Escribe el correo de tu cuenta y te enviaremos un enlace para crear una contraseña nueva.</p>
+          <form id="password-reset-request-form">
+            <label class="field-label" for="recovery-email">Correo</label>
+            <input id="recovery-email" type="email" autocomplete="email" required>
+            <button class="primary-button full-button" type="submit">Enviar enlace <span>→</span></button>
+          </form>
+          <form id="password-update-form" class="hidden">
+            <label class="field-label" for="new-password">Nueva contraseña</label>
+            <input id="new-password" type="password" autocomplete="new-password" minlength="8" required>
+            <label class="field-label" for="confirm-password">Confirma la contraseña</label>
+            <input id="confirm-password" type="password" autocomplete="new-password" minlength="8" required>
+            <button class="primary-button full-button" type="submit">Guardar contraseña <span>→</span></button>
+          </form>
+          <button class="text-button" id="back-to-login" type="button">Volver a iniciar sesión</button>
+          <p id="password-reset-message" class="form-note hidden" role="status"></p>
+          <p id="password-reset-error" class="error-message hidden"></p>
+        </div>
+        <div id="dashboard" class="hidden">
+          <p id="admin-error" class="error-message hidden"></p>
+          <nav class="dashboard-nav" aria-label="Apartados del panel">
+            <button class="dashboard-nav-button" type="button" data-dashboard-section="today" aria-pressed="false">Hoy</button>
+            <button class="dashboard-nav-button" type="button" data-dashboard-section="requests" aria-pressed="false">Solicitudes <span class="dashboard-nav-badge" data-dashboard-count="requests">0</span></button>
+            <button class="dashboard-nav-button" type="button" data-dashboard-section="accepted" aria-pressed="false">Citas aceptadas <span class="dashboard-nav-badge" data-dashboard-count="accepted">0</span></button>
+            <button class="dashboard-nav-button" type="button" data-dashboard-section="calendar" aria-pressed="false">Agenda semanal</button>
+            <button class="dashboard-nav-button" type="button" data-dashboard-section="debts" aria-pressed="false">Deudas</button>
+            <button class="dashboard-nav-button" type="button" data-dashboard-section="income" aria-pressed="false">Ingresos</button>
+            <button class="dashboard-nav-button" type="button" data-dashboard-section="schedule" aria-pressed="false">Gestionar horarios</button>
+            <button class="dashboard-nav-button" type="button" data-dashboard-section="transfer-settings" aria-pressed="false">Datos de pago</button>
+          </nav>
+          <div id="team-dashboard-selector" class="dashboard-staff-selector hidden">
+            <label class="field-label" for="admin-staff">Agenda del barbero</label>
+            <select id="admin-staff" aria-label="Seleccionar barbero"></select>
+          </div>
+          <div id="dashboard-global-stats" class="stats-row dashboard-global-stats" aria-label="Resumen de citas">
+            <button class="stat-card dashboard-stat-card" type="button" data-dashboard-section="requests" aria-pressed="false">
+              <strong id="pending-count">0</strong><span>Solicitudes pendientes · Ver lista</span>
+            </button>
+            <button class="stat-card dashboard-stat-card" type="button" data-dashboard-section="accepted" aria-pressed="false">
+              <strong id="accepted-count">0</strong><span>Citas aceptadas · Ver agenda</span>
+            </button>
+            <p id="dashboard-stats-status" class="dashboard-stats-status hidden" role="status" aria-live="polite"></p>
+          </div>
+          <section id="dashboard-today" class="dashboard-section hidden">
+            <div class="dashboard-header">
+              <div><div class="eyebrow">TU DÍA, BAJO CONTROL</div><h1>Agenda</h1></div>
+            </div>
+            <p id="dashboard-account-label" class="dashboard-account-label" role="status"></p>
+            <p id="appointment-notification-status" class="form-note hidden" role="status" aria-live="polite"></p>
+            <label class="notification-consent dashboard-sound-setting" for="new-appointment-sound-enabled">
+              <input id="new-appointment-sound-enabled" type="checkbox">
+              <span>Reproducir alerta cuando llegue una solicitud nueva, mientras este panel esté abierto.</span>
+            </label>
+            <p id="new-appointment-sound-status" class="form-note" role="status"></p>
+            <div class="dashboard-date dashboard-open-state">
+              <label class="toggle-control"><span id="open-label">Abierta</span><input id="open-toggle" type="checkbox"><span class="toggle"></span></label>
+            </div>
+            <p class="muted compact">Estado de agenda para recibir nuevas solicitudes.</p>
+            <p id="open-error" class="error-message hidden"></p>
+            <div class="section-heading admin-section-heading">
+              <div><span class="step-label">TU DÍA</span><h2>Hoy · <span id="today-date-label"></span></h2></div>
+              <button class="icon-button dashboard-refresh-button" type="button" aria-label="Actualizar agenda de hoy">↻</button>
+            </div>
+            <article id="today-next-appointment" class="today-next-card" aria-live="polite">
+              <strong class="today-next-empty">Cargando tu próxima cita…</strong>
+            </article>
+            <div class="today-list-heading"><h3>Agenda de hoy</h3><span>Horas de Colombia</span></div>
+            <div id="today-appointment-list" class="today-appointment-list"></div>
+            <div id="today-shortcuts" class="today-shortcuts" aria-label="Accesos rápidos">
+              <button class="quiet-button" type="button" data-dashboard-section="requests">Revisar solicitudes</button>
+              <button class="quiet-button" type="button" data-dashboard-section="accepted">Gestionar citas</button>
+              <button class="quiet-button" type="button" data-dashboard-section="schedule">Gestionar horarios</button>
+              <button class="quiet-button" type="button" data-dashboard-section="transfer-settings">Datos de pago</button>
+            </div>
+          </section>
+          <section id="dashboard-requests" class="dashboard-section">
+            <div class="section-heading admin-section-heading">
+              <div><span class="step-label">SOLICITUDES</span><h2>Pendientes por confirmar</h2></div>
+              <button id="refresh-button" class="icon-button" type="button" aria-label="Actualizar solicitudes">↻</button>
+            </div>
+            <div id="appointment-list" class="appointment-list"></div>
+          </section>
+          <section id="dashboard-accepted" class="dashboard-section hidden">
+            <div class="section-heading admin-section-heading">
+              <div><span class="step-label">AGENDA CONFIRMADA</span><h2>Próximas citas aceptadas</h2></div>
+              <button class="icon-button dashboard-refresh-button" type="button" aria-label="Actualizar citas">↻</button>
+            </div>
+            <div class="booking-card delay-control">
+              <strong>¿Necesitas avisar un retraso?</strong>
+              <p class="muted compact">Elige el día de las citas aceptadas que recibirán el aviso. Lo verán en su enlace personal.</p>
+              <label class="field-label" for="delay-date">Día de las citas</label>
+              <input id="delay-date" type="date">
+              <div class="delay-options">
+                <button class="quiet-button" type="button" data-delay-minutes="10">Avisar 10 min</button>
+                <button class="quiet-button" type="button" data-delay-minutes="15">Avisar 15 min</button>
+                <button class="quiet-button" type="button" data-delay-minutes="20">Avisar 20 min</button>
+              </div>
+              <p id="delay-status" class="form-note hidden" role="status"></p>
+              <p id="delay-error" class="error-message hidden"></p>
+            </div>
+            <p id="no-show-summary" class="muted compact" role="status">Esta semana: 0 citas en las que los clientes no llegaron.</p>
+            <div id="accepted-appointment-list" class="appointment-list"></div>
+          </section>
+          <section id="dashboard-calendar" class="dashboard-section hidden">
+            <div class="section-heading admin-section-heading">
+              <div><span class="step-label">CALENDARIO</span><h2>Agenda semanal</h2></div>
+              <div class="calendar-week-controls">
+                <button id="calendar-prev-week" class="icon-button" type="button" aria-label="Semana anterior">←</button>
+                <button id="calendar-today" class="quiet-button" type="button">Hoy</button>
+                <button id="calendar-next-week" class="icon-button" type="button" aria-label="Semana siguiente">→</button>
+              </div>
+            </div>
+            <p id="calendar-week-label" class="form-note" aria-live="polite"></p>
+            <div id="calendar-week-list" class="appointment-list"></div>
+            <p id="calendar-error" class="error-message hidden"></p>
+          </section>
+          <section id="dashboard-debts" class="dashboard-section hidden">
+            <div class="section-heading admin-section-heading">
+              <div><span class="step-label">PAGOS PENDIENTES</span><h2>Lista de deudas</h2></div>
+              <button class="icon-button dashboard-refresh-button" type="button" aria-label="Actualizar deudas">↻</button>
+            </div>
+            <div id="debt-appointment-list" class="appointment-list"></div>
+          </section>
+          <section id="dashboard-income" class="dashboard-section hidden">
+            <div class="section-heading admin-section-heading">
+              <div><span class="step-label">RESUMEN DE PAGOS</span><h2>Ingresos cobrados</h2></div>
+              <button id="refresh-income" class="icon-button" type="button" aria-label="Actualizar ingresos">↻</button>
+            </div>
+            <div class="income-periods" role="group" aria-label="Periodo de ingresos">
+              <button class="dashboard-nav-button active" type="button" data-income-period="day" aria-pressed="true">Día</button>
+              <button class="dashboard-nav-button" type="button" data-income-period="week" aria-pressed="false">Semana</button>
+              <button class="dashboard-nav-button" type="button" data-income-period="month" aria-pressed="false">Mes</button>
+            </div>
+            <p id="income-period-label" class="form-note" aria-live="polite"></p>
+            <div class="stats-row income-stats">
+              <div class="stat-card"><strong id="income-total">$0</strong><span>Total cobrado</span></div>
+              <div class="stat-card"><strong id="income-count">0</strong><span>Citas atendidas y pagadas</span></div>
+            </div>
+            <div class="payment-method-totals">
+              <div class="detail-item"><span>EFECTIVO</span><strong id="income-cash">$0</strong></div>
+              <div class="detail-item"><span>TRANSFERENCIA</span><strong id="income-transfer">$0</strong></div>
+            </div>
+            <div class="income-clear-control">
+              <p class="form-note">Al borrar, las citas se conservan, pero sus pagos se quitarán del resumen y quedarán pendientes de pago.</p>
+              <button id="clear-income-period" class="reject-button full-button" type="button" disabled>Eliminar ingresos de este período</button>
+            </div>
+            <p id="income-error" class="error-message hidden"></p>
+          </section>
+          <section id="dashboard-transfer-settings" class="dashboard-section hidden">
+            <section class="booking-card settings-group">
+              <div class="section-heading admin-section-heading">
+                <div><span class="step-label">PERFIL PÚBLICO</span><h2>Información de la barbería</h2></div>
+              </div>
+              <p class="muted compact">Estos datos aparecen en tu página pública, junto a tus reseñas y el código QR.</p>
+              <label class="field-label" for="public-description">Descripción</label>
+              <textarea id="public-description" maxlength="1000" rows="4" placeholder="Cuéntales a tus clientes sobre tu barbería"></textarea>
+              <label class="field-label" for="public-address">Dirección</label>
+              <input id="public-address" type="text" maxlength="250" placeholder="Dirección de la barbería">
+              <label class="field-label" for="public-phone">Teléfono público</label>
+              <input id="public-phone" type="tel" maxlength="30" placeholder="Número de contacto">
+              <label class="field-label" for="public-maps-url">Enlace de Google Maps</label>
+              <input id="public-maps-url" type="url" maxlength="1000" placeholder="https://maps.google.com/...">
+              <button id="save-public-profile" class="primary-button full-button" type="button">Guardar perfil público</button>
+              <div class="profile-qr-admin">
+                <a id="admin-profile-link" class="personal-link" href="#" target="_blank" rel="noopener noreferrer"></a>
+                <div id="admin-profile-qr" class="profile-qr"></div>
+                <button id="download-profile-qr" class="quiet-button full-button" type="button">Descargar QR de mi barbería</button>
+              </div>
+            </section>
+            <section class="booking-card settings-group">
+              <div class="section-heading admin-section-heading">
+                <div><span class="step-label">GALERÍA PÚBLICA</span><h2>Fotos de la barbería</h2></div>
+              </div>
+              <p class="muted compact">Sube fotos de tus cortes y trabajos aquí. Aparecerán juntas arriba de la información pública, no dentro de los servicios.</p>
+              <div id="public-gallery-list" class="public-gallery-list"></div>
+              <p id="public-gallery-count" class="form-note" aria-live="polite">0 de 12 fotos</p>
+              <label class="field-label" for="public-gallery-files">Agregar fotos de la barbería (JPG, PNG o WebP · máximo 5 MB cada una)</label>
+              <input id="public-gallery-files" type="file" accept="image/jpeg,image/png,image/webp" multiple>
+              <p id="public-gallery-help" class="form-note">Puedes publicar hasta 12 fotos por profesional. Estas fotos no se agregan a tus servicios.</p>
+              <p id="public-gallery-status" class="form-note" role="status" aria-live="polite"></p>
+              <button id="save-public-gallery" class="primary-button full-button" type="button">Guardar galería <span>→</span></button>
+              <p id="public-gallery-error" class="error-message hidden" role="alert"></p>
+            </section>
+            <section class="booking-card settings-group">
+              <div class="section-heading admin-section-heading">
+                <div><span class="step-label">MIS PAGOS</span><h2>Mi cuenta bancaria</h2></div>
+              </div>
+              <p class="muted compact">Cada profesional configura sus medios de pago y anticipos. Se pide anticipo cuando el cliente elige efectivo; si elige transferencia, debe pagar el total.</p>
+              <div id="transfer-method-list" class="transfer-method-list"></div>
+              <button id="add-transfer-method" class="quiet-button full-button" type="button">Agregar cuenta o medio de pago</button>
+              <label class="notification-consent" for="deposit-enabled">
+                <input id="deposit-enabled" type="checkbox">
+                <span>Solicitar anticipo a las reservas que eligen efectivo.</span>
+              </label>
+              <label class="field-label" for="deposit-type">Valor del anticipo</label>
+              <select id="deposit-type">
+                <option value="percent">50 % del total</option>
+                <option value="fixed">5.000 COP (o el total si es menor)</option>
+              </select>
+              <p class="form-note">Con anticipo activado, las reservas en efectivo pagan el anticipo por transferencia y el saldo en efectivo al finalizar. Si el cliente elige transferencia, paga el total. El valor se fija al reservar.</p>
+            </section>
+            <section class="booking-card settings-group">
+              <div class="section-heading admin-section-heading">
+                <div><span class="step-label">CORTES Y PRECIOS</span><h2>Mis servicios</h2></div>
+              </div>
+              <p class="muted compact">Agrega los cortes y precios que tus clientes podrán seleccionar al reservar.</p>
+              <div id="service-catalog-list" class="service-catalog-list"></div>
+              <button id="add-service" class="quiet-button full-button" type="button">Agregar corte o servicio</button>
+              <button id="save-transfer-details" class="primary-button full-button" type="button">Guardar cambios <span>→</span></button>
+            </section>
+            <p id="transfer-settings-error" class="error-message hidden"></p>
+          </section>
+          <section id="dashboard-schedule" class="dashboard-section hidden">
+            <p id="staff-agenda-note" class="muted compact hidden"></p>
+            <div class="dashboard-date schedule-date">
+              <label class="field-label" for="admin-date">Semana de las citas</label>
+              <input id="admin-date" type="date" aria-label="Elige una fecha de la semana que quieres consultar">
+              <p id="admin-week-label" class="form-note" aria-live="polite"></p>
+            </div>
+            <section class="booking-card schedule-editor">
+            <div class="section-heading">
+              <div><span class="step-label">DISPONIBILIDAD</span><h2>Configura tus horarios</h2></div>
+            </div>
+            <p class="muted compact">Configura cada día de lunes a domingo por separado. El horario no se repite automáticamente; la semana siguiente solo se puede organizar desde el domingo.</p>
+            <label class="field-label" for="schedule-date">Día de la agenda</label>
+            <input id="schedule-date" type="date">
+            <label class="toggle-control schedule-open-control"><span id="schedule-working-label">Disponible en esta fecha</span><input id="schedule-working" type="checkbox"><span class="toggle"></span></label>
+            <div id="schedule-time-controls" class="time-range-editor">
+              <div><span class="field-label">Abres a las</span><div id="schedule-open-time" class="twelve-hour-picker"></div></div>
+              <div><span class="field-label">Cierras a las</span><div id="schedule-close-time" class="twelve-hour-picker"></div></div>
+            </div>
+            <div class="booking-card schedule-option-card">
+              <label class="field-label" for="slot-duration">Intervalo entre horarios disponibles</label>
+              <select id="slot-duration">
+                <option value="30">30 minutos</option>
+                <option value="40">40 minutos</option>
+                <option value="50">50 minutos</option>
+                <option value="60">1 hora</option>
+              </select>
+              <button id="save-slot-duration" class="quiet-button full-button" type="button">Guardar intervalo</button>
+              <p id="duration-error" class="error-message hidden"></p>
+            </div>
+            <div class="booking-card schedule-option-card">
+              <strong>Agregar horas de descanso</strong>
+              <p class="muted compact">Bloquea un intervalo para almuerzo, descanso u otro compromiso. El descanso aplica a la fecha seleccionada.</p>
+              <label class="field-label" for="break-date">Día del descanso</label>
+              <input id="break-date" type="date">
+              <div class="time-range-editor">
+                <div><label class="field-label" for="break-start">Desde</label><input id="break-start" type="time" value="12:00" required></div>
+                <div><label class="field-label" for="break-end">Hasta</label><input id="break-end" type="time" value="13:00" required></div>
+              </div>
+              <label class="field-label" for="break-reason">Descripción (opcional)</label>
+              <input id="break-reason" type="text" maxlength="80" placeholder="Almuerzo, descanso…">
+              <button id="add-break" class="quiet-button full-button" type="button">Agregar descanso</button>
+              <div id="break-list" class="break-list"></div>
+              <p id="break-error" class="error-message hidden"></p>
+            </div>
+            <button id="save-schedule" class="primary-button full-button" type="button">Guardar horario <span>→</span></button>
+            <button id="clear-date-schedule" class="quiet-button full-button hidden" type="button">Quitar configuración de este día</button>
+            <p id="schedule-error" class="error-message hidden"></p>
+            </section>
+          </section>
+          <nav class="dashboard-mobile-nav" aria-label="Navegación principal del panel">
+            <button type="button" data-dashboard-section="today" aria-pressed="false"><span aria-hidden="true">⌂</span>Hoy</button>
+            <button type="button" data-dashboard-section="calendar" aria-pressed="false"><span aria-hidden="true">▦</span>Semana</button>
+            <button type="button" data-dashboard-section="debts" aria-pressed="false"><span aria-hidden="true">$</span>Pagos</button>
+            <button type="button" data-dashboard-section="income" aria-pressed="false"><span aria-hidden="true">▤</span>Resumen</button>
+            <button type="button" class="dashboard-more-toggle" data-dashboard-more aria-expanded="false" aria-controls="dashboard-more-menu"><span aria-hidden="true">＋</span>Más</button>
+            <div id="dashboard-more-menu" class="dashboard-mobile-more-menu hidden">
+              <strong>Todos los apartados</strong>
+              <button type="button" data-dashboard-section="today">Hoy</button>
+              <button type="button" data-dashboard-section="requests">Solicitudes <span class="dashboard-nav-badge" data-dashboard-count="requests">0</span></button>
+              <button type="button" data-dashboard-section="accepted">Citas aceptadas <span class="dashboard-nav-badge" data-dashboard-count="accepted">0</span></button>
+              <button type="button" data-dashboard-section="calendar">Agenda semanal</button>
+              <button type="button" data-dashboard-section="debts">Deudas</button>
+              <button type="button" data-dashboard-section="income">Ingresos</button>
+              <button type="button" data-dashboard-section="schedule">Gestionar horarios</button>
+              <button type="button" data-dashboard-section="transfer-settings">Datos de pago</button>
+            </div>
+          </nav>
+        </div>
+        <section id="platform-admin-panel" class="booking-card hidden">
+          <div class="eyebrow"><span class="status-dot"></span> ADMINISTRACIÓN DE PLATAFORMA</div>
+          <h2>Barberías y profesionales</h2>
+          <p class="muted">Crea y elimina barberías, y administra su equipo. Cada profesional usa su propia cuenta para completar sus cortes, pagos y agenda. Las eliminaciones son permanentes y requieren escribir el nombre para confirmarlas.</p>
+          <p id="platform-admin-error" class="error-message hidden"></p>
+          <div id="platform-admin-tools">
+            <details class="admin-instructions">
+              <summary>Cómo crear cuentas en Supabase</summary>
+              <ol>
+                <li>Abre tu proyecto en Supabase y entra a <strong>Authentication → Users → Add user</strong>.</li>
+                <li>Crea una cuenta independiente para cada trabajador que tendrá acceso al panel.</li>
+                <li>Después crea la barbería y agrega cada trabajador con el mismo correo que registraste en Supabase Auth.</li>
+                <li>Comparte las contraseñas de forma privada; nunca las escribas en este panel.</li>
+              </ol>
+            </details>
+            <section class="booking-card settings-group platform-admin-shop-form">
+              <div class="section-heading admin-section-heading">
+                <div><span class="step-label">NUEVA BARBERÍA</span><h3>Agregar barbería</h3></div>
+              </div>
+              <label class="field-label" for="platform-admin-shop-name">Nombre público</label>
+              <input id="platform-admin-shop-name" type="text" maxlength="100" placeholder="Ej. Barbería Centro">
+              <label class="field-label" for="platform-admin-shop-slug">Enlace corto</label>
+              <input id="platform-admin-shop-slug" type="text" maxlength="100" placeholder="barberia-centro" pattern="[a-z0-9]+(-[a-z0-9]+)*">
+              <p class="form-note">Usa minúsculas, números y guiones. El enlace será <code>?barber=barberia-centro</code>.</p>
+              <button id="platform-admin-create-shop" class="primary-button full-button" type="button">Crear barbería <span>→</span></button>
+            </section>
+            <section class="booking-card settings-group">
+              <div class="section-heading admin-section-heading">
+                <div><span class="step-label">EQUIPO</span><h3>Agregar profesional</h3></div>
+              </div>
+            <label class="field-label" for="platform-admin-barber">Barbería</label>
+            <select id="platform-admin-barber"></select>
+            <button id="platform-admin-delete-shop" class="reject-button full-button" type="button" disabled>Eliminar barbería y todo su historial</button>
+            <p class="form-note">La eliminación es permanente: borra también sus profesionales, horarios, citas e historial de pagos. Las cuentas de Supabase Auth no se eliminan.</p>
+            <div class="team-member-form">
+              <label class="field-label" for="platform-admin-name">Nombre del barbero</label>
+              <input id="platform-admin-name" type="text" maxlength="100" placeholder="Ej. Erik">
+              <label class="field-label" for="platform-admin-email">Correo de su cuenta de Supabase</label>
+              <input id="platform-admin-email" type="email" maxlength="254" placeholder="barbero@ejemplo.com">
+              <p class="form-note">La cuenta debe existir en Supabase → Authentication → Users. No ingreses contraseñas aquí.</p>
+              <button id="platform-admin-add-member" class="primary-button full-button" type="button">Agregar a esta barbería <span>→</span></button>
+            </div>
+            <h3>Equipo actual</h3>
+            <div id="platform-admin-team-list" class="team-member-list"></div>
+            </section>
+            <section class="booking-card settings-group">
+              <div class="section-heading admin-section-heading">
+                <div><span class="step-label">MODERACIÓN</span><h3>Comentarios de clientes</h3></div>
+              </div>
+              <p class="muted compact">Solo el administrador de plataforma puede eliminar reseñas completas de cualquier barbería, incluida su calificación.</p>
+              <div id="platform-admin-review-list" class="team-member-list"></div>
+            </section>
+          </div>
+        </section>
+        <footer class="page-footer page-credit-footer"><span>Hecho por Jose Manuel Morales Estrada</span><span>© <span class="current-year"></span></span></footer>
+      </section>
+    </main>
+    <div id="toast" class="toast hidden" role="status"></div>
+    <dialog id="navigation-guide-dialog" class="navigation-guide-dialog" aria-labelledby="navigation-guide-title">
+      <div class="section-heading">
+        <div><span class="step-label">GUÍA COMPLETA</span><h2 id="navigation-guide-title">Guía de Barberlink</h2></div>
+        <button id="close-navigation-guide" class="icon-button" type="button" aria-label="Cerrar guía">×</button>
+      </div>
+      <p class="muted compact">Consulta qué puedes hacer como cliente, barbero o administrador. Algunas opciones dependen de tu cuenta y permisos.</p>
+      <section class="guide-section">
+        <h3>1. Cómo moverte</h3>
+        <ul>
+          <li>El botón <strong>?</strong> junto al menú abre esta guía. El botón del final también abre la información para barberos.</li>
+          <li>El menú de tres líneas lleva al directorio, a la reserva, a tu cita personal o a los paneles disponibles para tu cuenta.</li>
+          <li>En el directorio elige una barbería. En su página, revisa la galería y la información pública y baja hasta <strong>Información de barberos</strong> para volver a consultar esta guía.</li>
+        </ul>
+      </section>
+      <section class="guide-section">
+        <h3>2. Pedir una cita</h3>
+        <ul>
+          <li>La reserva tiene dos pasos: primero elige barbero, uno o varios servicios, y escribe nombre, teléfono y correo; después selecciona fecha, hora y preferencias de avisos.</li>
+          <li>Los precios seleccionados muestran un total estimado. Los horarios se muestran en hora de Colombia; puedes consultar los días de la semana y, cuando esté habilitada, avanzar a la siguiente. La próxima semana se habilita el domingo.</li>
+          <li>Puedes pagar en efectivo o por transferencia. Si el barbero configuró anticipo, las reservas en efectivo pueden pedir el valor configurado (50 % o $5.000 COP, hasta el total); al elegir transferencia se solicita el pago total.</li>
+          <li>Al pedir la cita no necesitas crear una cuenta. Recibes un enlace personal para consultar el estado; el horario queda pendiente de respuesta por hasta 10 minutos.</li>
+        </ul>
+      </section>
+      <section class="guide-section">
+        <h3>3. Consultar y gestionar tu cita</h3>
+        <ul>
+          <li>Abre <strong>Ver mi cita</strong> en el menú o usa el enlace personal para revisar datos, estado, aviso de retraso y verificación del pago.</li>
+          <li>Desde el enlace puedes cancelar la solicitud o cita, responder a una propuesta de reprogramación y administrar recordatorios por correo.</li>
+          <li>Si pagas por transferencia, indica si transferirás ahora o después. Cuando corresponda, consulta los medios de pago, envía la captura del comprobante desde el enlace y revisa si el barbero la marcó verificada.</li>
+          <li>Al enviar la reserva puedes aceptar avisos de retraso por correo y notificación push, activar recordatorios por correo 24 y 2 horas antes y, si quieres, habilitar sonido para las notificaciones push mientras Barberlink esté abierta.</li>
+          <li>Después de una cita atendida puedes dejar una calificación y comentario. Las reseñas publicadas se muestran en el perfil de la barbería.</li>
+        </ul>
+      </section>
+      <section class="guide-section">
+        <h3>4. Información para barberos</h3>
+        <div class="guide-plan-price" aria-label="Plan Barbero Completo, 25.000 pesos colombianos al mes">
+          <div><strong>Plan Barbero Completo</strong><span>Acceso a las herramientas descritas en esta guía</span></div>
+          <p><strong>$25.000</strong><span>COP / mes</span></p>
+        </div>
+        <ul>
+          <li><strong>Acceso y equipo:</strong> entra desde <strong>Panel del barbero</strong> con tu cuenta. Si olvidas la contraseña, solicita un enlace de recuperación. El propietario puede elegir qué profesional gestiona; cada barbero del equipo ve y modifica su propia agenda según sus permisos.</li>
+          <li><strong>Empieza en Hoy:</strong> consulta la siguiente cita y el resto de la agenda del día. Activa o pausa la recepción de nuevas solicitudes desde el estado de apertura. Si quieres oír las solicitudes nuevas, activa su sonido y deja el panel abierto; el navegador puede pedir permiso para reproducir audio.</li>
+          <li><strong>Atiende las solicitudes:</strong> revisa cliente, datos de contacto, servicios solicitados, total estimado, pago y contador de respuesta. Acepta o rechaza antes de que venza el plazo de 10 minutos. Si la reserva requiere transferencia, primero revisa el comprobante; el botón de aceptar permanece deshabilitado hasta que el cliente lo envíe.</li>
+          <li><strong>Verifica la transferencia:</strong> abre la captura y confirma si recibiste el anticipo o el pago total. La confirmación queda visible para el cliente; al verificar se cierra esa opción para evitar confirmarla de nuevo. Si no recibiste el dinero, marca <strong>No verificado</strong>.</li>
+          <li><strong>Organiza las citas aceptadas:</strong> avisa retrasos de 10, 15 o 20 minutos a los clientes que aceptaron avisos. Si necesitas cambiar una cita, genera hasta 10 opciones libres de los próximos 7 días; el cliente elige una desde su enlace personal y la disponibilidad se comprueba de nuevo.</li>
+          <li><strong>Finaliza cada servicio:</strong> confirma o ajusta el precio final. Marca pagado y registra si recibiste efectivo o transferencia, o registra el saldo pendiente como deuda. Si ya verificaste un anticipo, el formulario lo descuenta y te indica cuánto saldo cobrar. Después de la hora de la cita, puedes marcar <strong>No llegó</strong>; esa cita no suma como ingreso ni como deuda.</li>
+          <li><strong>Planifica cada semana:</strong> abre <strong>Agenda semanal</strong> para ver las citas pendientes y aceptadas. Cambia la semana desde los controles; toca una hora libre para bloquearla y reactívala si quieres ofrecerla otra vez. En <strong>Gestionar horarios</strong>, define disponibilidad por fecha, intervalo de 30, 40, 50 o 60 minutos y descansos. Los horarios se configuran semana a semana, no se copian solos; puedes preparar la siguiente desde el domingo.</li>
+          <li><strong>Controla pagos:</strong> en <strong>Deudas</strong>, marca las cuentas cuando se paguen. En <strong>Ingresos</strong>, compara día, semana o mes, cantidad de citas cobradas y totales en efectivo y transferencia. Eliminar el resumen de un período no borra citas: las devuelve a pendientes de pago.</li>
+          <li><strong>Completa Datos de pago:</strong> configura una o más cuentas bancarias, Nequi, Daviplata u otros medios. Elige si cobrarás anticipo en reservas en efectivo (50 % o $5.000 COP, hasta el total); las reservas por transferencia piden el total. Mantén al día servicios y precios, descripción, dirección, teléfono y mapa públicos. Administra una galería separada de hasta 12 fotos JPG, PNG o WebP, máximo 5 MB cada una; ahí también encuentras el enlace público y el QR descargable.</li>
+          <li><strong>Muévete por el panel:</strong> en computador desplaza la barra de navegación; en móvil usa la barra inferior y toca <strong>Más</strong> para ver todas las secciones. Los contadores muestran solicitudes pendientes y citas aceptadas; los datos se actualizan automáticamente y también puedes usar el botón de actualizar.</li>
+        </ul>
+      </section>
+      <section class="guide-section">
+        <h3>5. Administración de la plataforma</h3>
+        <ul>
+          <li>Las cuentas autorizadas pueden crear barberías y agregar profesionales vinculados a sus cuentas de acceso.</li>
+          <li>El administrador puede gestionar el equipo, eliminar barberías con su historial o profesionales, y moderar reseñas. Las eliminaciones requieren confirmación y son permanentes; las cuentas de autenticación no se eliminan al borrar una barbería.</li>
+        </ul>
+      </section>
+      <section class="guide-section">
+        <h3>6. Instalación y avisos</h3>
+        <ul>
+          <li>Barberlink se puede instalar como aplicación (PWA). Para push y sonidos del navegador se requiere HTTPS o localhost; en iPhone, las notificaciones push requieren abrir la aplicación instalada desde la pantalla de inicio. El sonido solo funciona mientras la aplicación está abierta y el navegador permite reproducirlo.</li>
+        </ul>
+      </section>
+    </dialog>
+    <dialog id="transfer-details-dialog" class="transfer-dialog">
+      <div class="section-heading">
+        <div><span class="step-label">TRANSFERENCIA</span><h2>Datos para pagar</h2></div>
+        <button id="close-transfer-dialog" class="icon-button" type="button" aria-label="Cerrar">×</button>
+      </div>
+      <p class="muted compact">Después de transferir, toma una captura de pantalla del comprobante. Abre el enlace de tu cita y envíala para que el barbero pueda verificar el pago.</p>
+      <div id="transfer-dialog-details" class="transfer-details"></div>
+      <a id="transfer-dialog-appointment-link" class="personal-link" href="#">Ver mi cita</a>
+      <p id="transfer-dialog-note" class="form-note hidden" role="status"></p>
+    </dialog>
+    <dialog id="transfer-proof-dialog" class="transfer-proof-dialog">
+      <div class="section-heading">
+        <div><span class="step-label">COMPROBANTE</span><h2>Transferencia</h2></div>
+        <div class="transfer-proof-dialog-actions">
+          <button id="minimize-transfer-proof-dialog" class="icon-button" type="button" aria-label="Minimizar comprobante">−</button>
+          <button id="close-transfer-proof-dialog" class="icon-button" type="button" aria-label="Cerrar comprobante">×</button>
+        </div>
+      </div>
+      <img id="transfer-proof-dialog-image" alt="Comprobante de transferencia enviado por el cliente">
+    </dialog>
+    <dialog id="public-gallery-dialog" class="public-gallery-dialog" aria-labelledby="public-gallery-dialog-title">
+      <div class="section-heading">
+        <div><span class="step-label">GALERÍA</span><h2 id="public-gallery-dialog-title">Foto ampliada</h2></div>
+        <button id="close-public-gallery-dialog" class="icon-button" type="button" aria-label="Cerrar foto ampliada">×</button>
+      </div>
+      <img id="public-gallery-dialog-image" alt="">
+      <p id="public-gallery-dialog-caption" class="form-note"></p>
+    </dialog>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="./app.js?v=98"></script>
+</body>
+</html>
